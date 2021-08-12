@@ -36,20 +36,81 @@ BufferPoolManager::~BufferPoolManager() {
 
 Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   // 1.     Search the page table for the requested page (P).
+  latch_.lock();
+  auto iter = page_table_.find(page_id);
+  if(iter != page_table_.end()){
+    frame_id_t frameId = iter->second;
+    replacer_->Pin(frameId);
+    pages_[frameId].pin_count_++;
+    latch_.unlock();
+    return &pages_[frameId];
+  }
   // 1.1    If P exists, pin it and return it immediately.
   // 1.2    If P does not exist, find a replacement page (R) from either the free list or the replacer.
   //        Note that pages are always found from the free list first.
+  Page *new_frame = nullptr;
+  frame_id_t new_frame_id;
+
+  if(!free_list_.empty()){
+    new_frame_id = free_list_.front();
+    free_list_.pop_front();
+  }else if(!replacer_->Victim(&new_frame_id)){
+      return nullptr;
+  }
+  new_frame =  &pages_[new_frame_id];
+
   // 2.     If R is dirty, write it back to the disk.
+  if(new_frame->IsDirty()){
+    disk_manager_->WritePage(new_frame->GetPageId(), new_frame->GetData());
+  }
   // 3.     Delete R from the page table and insert P.
+  page_table_.erase(new_frame->GetPageId());
+  page_table_[page_id] = new_frame_id;
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
-  return nullptr;
+
+  disk_manager_->ReadPage(page_id, new_frame->GetData());
+  new_frame->is_dirty_ = false;
+  new_frame->pin_count_ = 1;
+  replacer_->Pin(new_frame_id);
+  latch_.unlock();
+
+  return new_frame;
 }
 
-bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) { return false; }
+bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
+  latch_.lock();
+  frame_id_t frame_id = page_table_[page_id];
+  Page * frame = &pages_[frame_id];
+  frame->is_dirty_ = is_dirty;
+
+  if(frame->GetPinCount() <= 0){
+    return false;
+  }
+
+  frame->pin_count_--;
+  latch_.unlock();
+  return true;
+}
 
 bool BufferPoolManager::FlushPageImpl(page_id_t page_id) {
   // Make sure you call DiskManager::WritePage!
-  return false;
+  latch_.lock();
+  if(page_id == INVALID_PAGE_ID){
+    return false;
+  }
+  auto iter = page_table_.find(page_id);
+  if(iter == page_table_.end()){
+    return false;
+  }
+
+  frame_id_t frame_id = iter->second;
+  auto frame = &pages_[frame_id];
+
+  disk_manager_->WritePage(page_id, frame->GetData());
+  frame->is_dirty_ = false;
+  latch_.unlock();
+
+  return true;
 }
 
 Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
