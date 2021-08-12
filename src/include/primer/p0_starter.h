@@ -24,10 +24,9 @@ template <typename T>
 class Matrix {
  protected:
   // TODO(P0): Add implementation
-  Matrix(int r, int c) : rows(r), cols(c)
-  {
+  Matrix(int r, int c) : rows(r), cols(c) {
     linear = new T[r * c];
-    memset(linear, 0, r * c * sizeof (T));
+    memset(linear, 0, r * c * sizeof(T));
   }
 
   // # of rows in the matrix
@@ -56,9 +55,7 @@ class Matrix {
   virtual void MatImport(T *arr) = 0;
 
   // TODO(P0): Add implementation
-  virtual ~Matrix() {
-    delete []linear;
-  }
+  virtual ~Matrix() { delete[] linear; }
 };
 
 template <typename T>
@@ -66,8 +63,8 @@ class RowMatrix : public Matrix<T> {
  public:
   // TODO(P0): Add implementation
   RowMatrix(int r, int c) : Matrix<T>(r, c) {
-    data_ = new T* [r];
-    for(int i = 0; i < r; i++){
+    data_ = new T *[r];
+    for (int i = 0; i < r; i++) {
       data_[i] = this->linear + i * c;
     }
   }
@@ -79,24 +76,16 @@ class RowMatrix : public Matrix<T> {
   int GetColumns() override { return this->cols; }
 
   // TODO(P0): Add implementation
-  T GetElem(int i, int j) override {
-    return data_[i][j];
-  }
+  T GetElem(int i, int j) override { return data_[i][j]; }
 
   // TODO(P0): Add implementation
-  void SetElem(int i, int j, T val) override {
-      data_[i][j] = val;
-  }
+  void SetElem(int i, int j, T val) override { data_[i][j] = val; }
 
   // TODO(P0): Add implementation
-  void MatImport(T *arr) override {
-    memcpy(this->linear, arr, GetColumns() * GetRows() * sizeof(T));
-  }
+  void MatImport(T *arr) override { memcpy(this->linear, arr, GetColumns() * GetRows() * sizeof(T)); }
 
   // TODO(P0): Add implementation
-  ~RowMatrix() override {
-      delete []data_;
-  };
+  ~RowMatrix() override { delete[] data_; };
 
  private:
   // 2D array containing the elements of the matrix in row-major format
@@ -116,18 +105,16 @@ class RowMatrixOperations {
     auto mat1_ptr = mat1.get();
     auto mat2_ptr = mat2.get();
 
-    if(mat1_ptr->GetRows() != mat1_ptr->GetRows()
-        || mat1_ptr->GetColumns() != mat2_ptr->GetColumns()){
+    if (mat1_ptr->GetRows() != mat1_ptr->GetRows() || mat1_ptr->GetColumns() != mat2_ptr->GetColumns()) {
       return std::unique_ptr<RowMatrix<T>>(nullptr);
     }
 
     std::unique_ptr<RowMatrix<int>> new_mat{new RowMatrix<T>(mat1_ptr->GetRows(), mat1_ptr->GetRows())};
-    for(int i = 0; i < mat1_ptr->GetRows(); i++){
-      for(int j = 0; j < mat2_ptr->GetColumns() ; j++){
+    for (int i = 0; i < mat1_ptr->GetRows(); i++) {
+      for (int j = 0; j < mat2_ptr->GetColumns(); j++) {
         new_mat->SetElem(i, j, mat1_ptr->GetElem(i, j) + mat2_ptr->GetElem(i, j));
       }
     }
-
 
     return new_mat;
   }
@@ -141,21 +128,20 @@ class RowMatrixOperations {
     auto mat1_ptr = mat1.get();
     auto mat2_ptr = mat2.get();
 
-    if(mat1_ptr->GetColumns() != mat2_ptr->GetRows()){
+    if (mat1_ptr->GetColumns() != mat2_ptr->GetRows()) {
       return std::unique_ptr<RowMatrix<T>>(nullptr);
     }
 
-     auto new_mat = new RowMatrix<T>(mat1_ptr->GetRows(), mat2_ptr->GetColumns());
-    for(int i = 0 ; i < mat1_ptr->GetRows(); i++){
-      for(int j = 0; j < mat2_ptr->GetColumns(); j++){
-        for(int p = 0; p < mat1_ptr->GetColumns();p++) {
+    auto new_mat = new RowMatrix<T>(mat1_ptr->GetRows(), mat2_ptr->GetColumns());
+    for (int i = 0; i < mat1_ptr->GetRows(); i++) {
+      for (int j = 0; j < mat2_ptr->GetColumns(); j++) {
+        for (int p = 0; p < mat1_ptr->GetColumns(); p++) {
           new_mat->SetElem(i, j, new_mat->GetElem(i, j) + mat1_ptr->GetElem(i, p) * mat2_ptr->GetElem(p, j));
         }
       }
     }
 
-
-    return std::unique_ptr<RowMatrix<T>> {new_mat};
+    return std::unique_ptr<RowMatrix<T>>{new_mat};
   }
 
   // Simplified GEMM (general matrix multiply) operation
