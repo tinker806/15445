@@ -66,7 +66,10 @@ class RowMatrix : public Matrix<T> {
  public:
   // TODO(P0): Add implementation
   RowMatrix(int r, int c) : Matrix<T>(r, c) {
-    data_ = &this->linear;
+    data_ = new T* [r];
+    for(int i = 0; i < r; i++){
+      data_[i] = this->linear + i * c;
+    }
   }
 
   // TODO(P0): Add implementation
@@ -77,12 +80,12 @@ class RowMatrix : public Matrix<T> {
 
   // TODO(P0): Add implementation
   T GetElem(int i, int j) override {
-    return this->linear[i * GetColumns() + j];
+    return data_[i][j];
   }
 
   // TODO(P0): Add implementation
   void SetElem(int i, int j, T val) override {
-    data_[i][j] = val;
+      data_[i][j] = val;
   }
 
   // TODO(P0): Add implementation
@@ -91,7 +94,9 @@ class RowMatrix : public Matrix<T> {
   }
 
   // TODO(P0): Add implementation
-  ~RowMatrix() override {};
+  ~RowMatrix() override {
+      delete []data_;
+  };
 
  private:
   // 2D array containing the elements of the matrix in row-major format
@@ -116,14 +121,15 @@ class RowMatrixOperations {
       return std::unique_ptr<RowMatrix<T>>(nullptr);
     }
 
-    auto new_mat = new RowMatrix<T>(mat1_ptr->GetRows(), mat1_ptr->GetRows());
-    for(int j = 0; j < mat1_ptr->GetRows(); j++){
-      for(int i = 0; i < mat2_ptr->GetColumns(); i++){
+    std::unique_ptr<RowMatrix<int>> new_mat{new RowMatrix<T>(mat1_ptr->GetRows(), mat1_ptr->GetRows())};
+    for(int i = 0; i < mat1_ptr->GetRows(); i++){
+      for(int j = 0; j < mat2_ptr->GetColumns() ; j++){
         new_mat->SetElem(i, j, mat1_ptr->GetElem(i, j) + mat2_ptr->GetElem(i, j));
       }
     }
 
-    return std::unique_ptr<RowMatrix<T>>(new_mat);
+
+    return new_mat;
   }
 
   // Compute matrix multiplication (mat1 * mat2) and return the result.
@@ -140,8 +146,8 @@ class RowMatrixOperations {
     }
 
      auto new_mat = new RowMatrix<T>(mat1_ptr->GetRows(), mat2_ptr->GetColumns());
-    for(int j = 0 ; j < mat1_ptr->GetRows(); j++){
-      for(int i = 0; i < mat2_ptr->GetColumns(); i++){
+    for(int i = 0 ; i < mat1_ptr->GetRows(); i++){
+      for(int j = 0; j < mat2_ptr->GetColumns(); j++){
         for(int p = 0; p < mat1_ptr->GetColumns();p++) {
           new_mat->SetElem(i, j, new_mat->GetElem(i, j) + mat1_ptr->GetElem(i, p) * mat2_ptr->GetElem(p, j));
         }
@@ -149,7 +155,7 @@ class RowMatrixOperations {
     }
 
 
-    return std::unique_ptr<RowMatrix<T>>(new_mat);
+    return std::unique_ptr<RowMatrix<T>> {new_mat};
   }
 
   // Simplified GEMM (general matrix multiply) operation
