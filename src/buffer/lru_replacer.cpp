@@ -19,8 +19,9 @@ LRUReplacer::LRUReplacer(size_t num_pages) : max_pages(num_pages) {}
 LRUReplacer::~LRUReplacer() = default;
 
 bool LRUReplacer::Victim(frame_id_t *frame_id) {
-  replacer_mutex.unlock();
-  if (Size() == 0) {
+  replacer_mutex.lock();
+  if (victim_queue.empty()) {
+    replacer_mutex.unlock();
     return false;
   }
   *frame_id = victim_queue.front();

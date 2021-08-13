@@ -71,6 +71,7 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   disk_manager_->ReadPage(page_id, new_frame->data_);
   new_frame->is_dirty_ = false;
   new_frame->pin_count_ = 1;
+  new_frame->page_id_ = page_id;
   replacer_->Pin(new_frame_id);
   latch_.unlock();
 
@@ -134,17 +135,25 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
   *page_id = disk_manager_->AllocatePage();
   // 2.   Pick a victim page P from either the free list or the replacer. Always pick from the free list first.
 
+
   auto frame = &pages_[frame_id];
+
+  if(frame->page_id_ != INVALID_PAGE_ID){
+    disk_manager_->WritePage(frame->page_id_, frame->GetData());
+  }
 
   page_table_.erase(frame->page_id_);
   frame->is_dirty_ = false;
   frame->pin_count_ = 1;
-  memset(frame->data_, 0, sizeof(frame->data_));
+
   frame->page_id_ = *page_id;
+  replacer_->Pin(frame_id);
   // 3.   Update P's metadata, zero out memory and add P to the page table.
 
   // 4.   Set the page ID output parameter. Return a pointer to P.
   page_table_[*page_id] = frame_id;
+
+  memset(frame->data_, 0, sizeof(frame->data_));
   latch_.unlock();
   return frame;
 }
