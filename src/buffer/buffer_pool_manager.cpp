@@ -38,7 +38,7 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   // 1.     Search the page table for the requested page (P).
   latch_.lock();
   auto iter = page_table_.find(page_id);
-  if(iter != page_table_.end()){
+  if (iter != page_table_.end()) {
     frame_id_t frameId = iter->second;
     replacer_->Pin(frameId);
     pages_[frameId].pin_count_++;
@@ -51,16 +51,16 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   Page *new_frame = nullptr;
   frame_id_t new_frame_id;
 
-  if(!free_list_.empty()){
+  if (!free_list_.empty()) {
     new_frame_id = free_list_.front();
     free_list_.pop_front();
-  }else if(!replacer_->Victim(&new_frame_id)){
-      return nullptr;
+  } else if (!replacer_->Victim(&new_frame_id)) {
+    return nullptr;
   }
-  new_frame =  &pages_[new_frame_id];
+  new_frame = &pages_[new_frame_id];
 
   // 2.     If R is dirty, write it back to the disk.
-  if(new_frame->IsDirty()){
+  if (new_frame->IsDirty()) {
     disk_manager_->WritePage(new_frame->GetPageId(), new_frame->GetData());
   }
   // 3.     Delete R from the page table and insert P.
@@ -68,7 +68,7 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   page_table_[page_id] = new_frame_id;
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
 
-  disk_manager_->ReadPage(page_id, new_frame->GetData());
+  disk_manager_->ReadPage(page_id, new_frame->data_);
   new_frame->is_dirty_ = false;
   new_frame->pin_count_ = 1;
   replacer_->Pin(new_frame_id);
@@ -80,10 +80,10 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
 bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
   latch_.lock();
   frame_id_t frame_id = page_table_[page_id];
-  Page * frame = &pages_[frame_id];
+  Page *frame = &pages_[frame_id];
   frame->is_dirty_ = is_dirty;
 
-  if(frame->GetPinCount() <= 0){
+  if (frame->GetPinCount() <= 0) {
     return false;
   }
 
@@ -95,11 +95,11 @@ bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
 bool BufferPoolManager::FlushPageImpl(page_id_t page_id) {
   // Make sure you call DiskManager::WritePage!
   latch_.lock();
-  if(page_id == INVALID_PAGE_ID){
+  if (page_id == INVALID_PAGE_ID) {
     return false;
   }
   auto iter = page_table_.find(page_id);
-  if(iter == page_table_.end()){
+  if (iter == page_table_.end()) {
     return false;
   }
 
@@ -116,23 +116,73 @@ bool BufferPoolManager::FlushPageImpl(page_id_t page_id) {
 Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
   // 0.   Make sure you call DiskManager::AllocatePage!
   // 1.   If all the pages in the buffer pool are pinned, return nullptr.
+  latch_.lock();
+  frame_id_t frame_id;
+
+  if (!free_list_.empty()) {
+    frame_id = free_list_.front();
+    free_list_.pop_front();
+  } else if (!replacer_->Victim(&frame_id)) {
+    return nullptr;
+  }
+
+  *page_id = disk_manager_->AllocatePage();
   // 2.   Pick a victim page P from either the free list or the replacer. Always pick from the free list first.
+
+  auto frame = &pages_[frame_id];
+
+  page_table_.erase(frame->page_id_);
+  frame->is_dirty_ = false;
+  frame->pin_count_ = 0;
+  memset(frame->data_, 0, sizeof(frame->data_));
+  frame->page_id_ = *page_id;
   // 3.   Update P's metadata, zero out memory and add P to the page table.
+
   // 4.   Set the page ID output parameter. Return a pointer to P.
-  return nullptr;
+  page_table_[*page_id] = frame_id;
+  latch_.unlock();
+  return frame;
 }
 
 bool BufferPoolManager::DeletePageImpl(page_id_t page_id) {
   // 0.   Make sure you call DiskManager::DeallocatePage!
   // 1.   Search the page table for the requested page (P).
+  latch_.lock();
+  if (page_table_.count(page_id) < 1) {
+    latch_.unlock();
+    return true;
+  }
   // 1.   If P does not exist, return true.
+  auto frame_id = page_table_[page_id];
+  auto frame = &pages_[frame_id];
+  if (frame->GetPinCount() > 0) {
+    latch_.unlock();
+    return false;
+  }
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
+
+  disk_manager_->DeallocatePage(page_id);
+  page_table_.erase(page_id);
+  free_list_.push_back(frame_id);
+  frame->page_id_ = INVALID_PAGE_ID;
+  frame->is_dirty_ = false;
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
-  return false;
+
+  latch_.unlock();
+  return true;
 }
 
 void BufferPoolManager::FlushAllPagesImpl() {
   // You can do it!
+  for (size_t i = 0; i < pool_size_; i++) {
+    auto frame = &pages_[i];
+    if (frame->page_id_ == INVALID_PAGE_ID) {
+      continue;
+    }
+
+    disk_manager_->WritePage(frame->GetPageId(), frame->GetData());
+    frame->is_dirty_ = false;
+  }
 }
 
 }  // namespace bustub

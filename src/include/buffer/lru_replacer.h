@@ -14,10 +14,9 @@
 
 #include <list>
 #include <mutex>  // NOLINT
-#include <vector>
 #include <queue>
 #include <set>
-#include <list>
+#include <vector>
 
 #include "buffer/replacer.h"
 #include "common/config.h"
