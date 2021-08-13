@@ -84,10 +84,14 @@ bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
   frame->is_dirty_ = is_dirty;
 
   if (frame->GetPinCount() <= 0) {
+    latch_.unlock();
     return false;
   }
 
   frame->pin_count_--;
+  if (frame->pin_count_ == 0){
+    replacer_->Unpin(frame_id);
+  }
   latch_.unlock();
   return true;
 }
@@ -123,6 +127,7 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
     frame_id = free_list_.front();
     free_list_.pop_front();
   } else if (!replacer_->Victim(&frame_id)) {
+    latch_.unlock();
     return nullptr;
   }
 
@@ -133,7 +138,7 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
 
   page_table_.erase(frame->page_id_);
   frame->is_dirty_ = false;
-  frame->pin_count_ = 0;
+  frame->pin_count_ = 1;
   memset(frame->data_, 0, sizeof(frame->data_));
   frame->page_id_ = *page_id;
   // 3.   Update P's metadata, zero out memory and add P to the page table.
