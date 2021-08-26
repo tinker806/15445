@@ -138,7 +138,7 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
 
   auto frame = &pages_[frame_id];
 
-  if(frame->page_id_ != INVALID_PAGE_ID){
+  if (frame->page_id_ != INVALID_PAGE_ID){
     disk_manager_->WritePage(frame->page_id_, frame->GetData());
   }
 
