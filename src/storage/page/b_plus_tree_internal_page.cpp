@@ -122,7 +122,9 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCo
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(const ValueType &old_value, const KeyType &new_key,
                                                      const ValueType &new_value) {
-
+  array[0].second = old_value;
+  array[1].first = new_key;
+  array[1].second = new_value;
 }
 /*
  * Insert new_key & new_value pair right after the pair with its value ==
@@ -156,6 +158,13 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *recipient,
                                                 BufferPoolManager *buffer_pool_manager) {
   int pairNum = GetSize();
+  for(int i = pairNum / 2; i < pairNum; i++){
+    recipient->array[i - pairNum / 2] = array[i];
+    recipient->SetSize(recipient->GetSize() + 1);
+
+    SetSize(GetSize() - 1);
+  }
+
 }
 
 /* Copy entries into me, starting from {items} and copy {size} entries.
@@ -163,7 +172,12 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *recipient
  * So I need to 'adopt' them by changing their parent page id, which needs to be persisted with BufferPoolManger
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType *items, int size, BufferPoolManager *buffer_pool_manager) {
+  for (int i = 0 ; i < size; i++, items++){
+    array[i] = items[i];
+  }
+
+}
 
 /*****************************************************************************
  * REMOVE
@@ -174,7 +188,12 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType *items, int size, Buf
  * NOTE: store key&value pair continuously after deletion
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {
+  for (int i = index; i < GetSize(); ++i) {
+    array[i] = array[i + 1];
+  }
+  SetSize(GetSize() - 1);
+}
 
 /*
  * Remove the only key & value pair in internal page and return the value
